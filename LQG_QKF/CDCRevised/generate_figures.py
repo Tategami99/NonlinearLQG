@@ -3,6 +3,8 @@ Regenerates Fig. 1 and Fig. 2 for the CDCRevised/ variant (Woodbury-based Theore
 LQG_QKF/CDC/generate_figures.py exactly except for the bound function used in Fig. 2 (theorem2_bound
 -> theorem2_bound_woodbury) -- Fig. 1 is unaffected by which Theorem 2 proof is used, but is regenerated
 independently here (fresh random draws) rather than reused, per the folder's self-containment.
+
+N_FIG1/N_FIG2 = 300, matching the paper's stated Fig. 1 sample size (Sec. V: "300 simulations").
 """
 
 import numpy as np
@@ -18,8 +20,8 @@ from sensor_selection_sim import (
     perf_dir, COLORS,
 )
 
-N_FIG1 = 150
-N_FIG2 = 60
+N_FIG1 = 300         # paper's stated sample size (CDC2026.tex Sec. V: "300 simulations")
+N_FIG2 = 300         # paper doesn't state Fig. 2's N explicitly; matched to Fig. 1's for consistency
 N_STATE = 4
 M_SENSORS = 7
 SIGMA0_SCALE = 10.0

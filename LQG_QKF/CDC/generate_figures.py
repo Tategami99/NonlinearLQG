@@ -22,8 +22,8 @@ from sensor_selection_sim import (
     perf_dir, COLORS,
 )
 
-N_FIG1 = 150          # paper uses 300; reduced for this comparison pass
-N_FIG2 = 60           # per sweep point
+N_FIG1 = 300          # paper's stated sample size (CDC2026.tex Sec. V: "300 simulations")
+N_FIG2 = 300          # paper doesn't state Fig. 2's N explicitly; matched to Fig. 1's for consistency
 N_STATE = 4
 M_SENSORS = 7
 SIGMA0_SCALE = 10.0
