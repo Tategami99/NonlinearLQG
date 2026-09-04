@@ -93,7 +93,7 @@ def generate_fig1():
     quad_mean, quad_std = np.array(quad_mean), np.array(quad_std)
     lin_mean, lin_std = np.array(lin_mean), np.array(lin_std)
 
-    fig, ax = plt.subplots(figsize=(10, 6.2))
+    fig, ax = plt.subplots(figsize=(10, 6.8))
     ax.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2,
                label='Optimal (brute force)', zorder=1)
     ax.plot(R_ratios, lin_mean, color=COLORS['lin'], marker='s',
@@ -105,11 +105,17 @@ def generate_fig1():
     ax.set_xscale('log')
     ax.set_xlabel(r'Target accuracy ratio $R_{\mathrm{ratio}}$  (smaller = stricter accuracy requirement)')
     ax.set_ylabel(r'Sensors used vs. optimal, $\ell/|S^\star|$  (1.0 = optimal)')
-    ax.legend(loc='upper left', framealpha=0.95)
     ax.grid(alpha=0.3)
     fig.suptitle('Fewer sensors needed with quadratic-aware selection', y=0.98, fontsize=16)
     ax.set_title(f'N={N_FIG1} trials/point, shaded band = ±1 std. dev.', fontsize=11, color='#555555', pad=10)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    # Legend placed OUTSIDE the axes (below the plot), not in a corner of the data area -- the random
+    # Monte Carlo draws aren't seeded, so a curve's exact shape shifts slightly run to run, and any
+    # "empty corner" chosen by eye today could get crossed by a curve on a future re-run. Placing the
+    # legend fully outside the axes makes overlap structurally impossible regardless of curve shape.
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.0), ncol=3,
+               fontsize=11.5, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.09, 1, 0.94])
     fig.savefig(perf_dir + 'fig1.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}fig1.png")
@@ -165,7 +171,7 @@ def generate_fig2():
     left = sweep_panel('C_scale', c_scales, fixed_C_scale=None, fixed_noise_scale=NOISE_SCALE_FIG1, rng=rng)
     right = sweep_panel('noise_scale', noise_scales, fixed_C_scale=10.0, fixed_noise_scale=None, rng=rng)
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6.3))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 7.0))
     for ax, xvals, data, xlabel, title in [
         (axes[0], c_scales, left, 'Linear-term magnitude (C scale)',
          'Varying the linear measurement term'),
@@ -185,7 +191,6 @@ def generate_fig2():
         ax.set_xlabel(xlabel)
         ax.set_ylabel(r'Supermodularity ratio $\gamma_h$' + '\n(higher = tighter guarantee)')
         ax.set_title(title, fontsize=13)
-        ax.legend(loc='lower right', framealpha=0.95, fontsize=10.5)
         ax.grid(alpha=0.3)
     fig.suptitle('How tight is the theoretical guarantee? (Woodbury bound)', y=1.0)
     fig.text(0.5, 0.925,
@@ -193,7 +198,12 @@ def generate_fig2():
               f'higher is a tighter, more useful guarantee. N={N_FIG2} trials/point, '
               rf'$R_\mathrm{{ratio}}={R_RATIO}$.',
               ha='center', fontsize=10.5, color='#555555')
-    fig.tight_layout(rect=[0, 0, 1, 0.89])
+    # One shared legend for both panels (they use identical series/colors), placed below both axes --
+    # see the comment in generate_fig1() for why legends live outside the data area in this file.
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.0), ncol=3,
+               fontsize=11, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.08, 1, 0.89])
     fig.savefig(perf_dir + 'fig2.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}fig2.png")

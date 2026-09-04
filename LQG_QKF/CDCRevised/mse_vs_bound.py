@@ -156,7 +156,7 @@ def make_plot(bounds, all_errors):
     lo = np.array([np.percentile(e, 25) for e in all_errors])
     hi = np.array([np.percentile(e, 75) for e in all_errors])
 
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6.6))
 
     ax = axes[0]
     ax.plot(NOISE_SCALES, bounds, color=COLOR_BOUND, marker='^',
@@ -170,7 +170,6 @@ def make_plot(bounds, all_errors):
     ax.set_xlabel(r'Measurement-noise scale $\sigma^2$')
     ax.set_ylabel('Squared estimation error')
     ax.set_title('Does the bound actually hold?', fontsize=12.5)
-    ax.legend(fontsize=9.5, loc='lower right', framealpha=0.95)
     ax.grid(alpha=0.3)
 
     ax = axes[1]
@@ -191,7 +190,15 @@ def make_plot(bounds, all_errors):
               f'N={N_TRIALS} trials/point). The bound is never violated, but a naive '
               f'estimator does not reliably approach it.',
               ha='center', fontsize=9.5, color='#555555')
-    fig.tight_layout(rect=[0, 0, 1, 0.86])
+    # Legend for the left panel's series only (the right panel has a single, unlabeled series), placed
+    # below BOTH panels at the figure level -- same pattern used successfully in generate_figures.py.
+    # An axes-relative anchor was tried first and it collided with the neighboring panel's x-axis label;
+    # anchoring to the whole figure instead avoids that (its position no longer depends on exactly where
+    # one axes ends and the next begins).
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.0), ncol=3,
+               fontsize=10, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.1, 1, 0.86])
     fig.savefig(perf_dir + 'remark1_mse_vs_bound.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}remark1_mse_vs_bound.png")
