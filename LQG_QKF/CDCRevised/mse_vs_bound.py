@@ -30,7 +30,7 @@ from tqdm import tqdm
 
 from sensor_selection_sim import (
     generate_spd, generate_M_stack, generate_C, per_sensor_info,
-    F_of, perf_dir,
+    F_of, perf_dir, pkl_dir,
 )
 
 N_STATE = 4
@@ -134,45 +134,94 @@ def run_sweep():
 FAILURE_THRESHOLD = 0.5  # squared-error cutoff in x-units (P has diagonal 10, so this is a generous cutoff)
 
 
+plt.rcParams.update({
+    'font.size': 13,
+    'axes.titlesize': 13,
+    'axes.labelsize': 13,
+    'xtick.labelsize': 11.5,
+    'ytick.labelsize': 11.5,
+    'legend.fontsize': 11,
+    'figure.titlesize': 15,
+    'lines.linewidth': 2.4,
+    'lines.markersize': 8,
+})
+
+# Same CVD-validated palette as sensor_selection_sim.py's COLORS -- see that file's comment.
+COLOR_BOUND = '#0072B2'   # blue: the theoretical (Van Trees) guarantee
+COLOR_EMPIRICAL = '#D55E00'  # vermillion: what a real estimator actually achieves
+
+
 def make_plot(bounds, all_errors):
     medians = np.array([np.median(e) for e in all_errors])
     lo = np.array([np.percentile(e, 25) for e in all_errors])
     hi = np.array([np.percentile(e, 75) for e in all_errors])
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6))
 
     ax = axes[0]
-    ax.plot(NOISE_SCALES, bounds, color='#ff7f0e', marker='^', label=r'Van Trees bound $\mathrm{Tr}(B_S)$')
-    ax.plot(NOISE_SCALES, medians, color='#1f77b4', marker='o', label='Median empirical SE (MAP estimator)')
-    ax.fill_between(NOISE_SCALES, lo, hi, color='#1f77b4', alpha=0.15, label='IQR (25th-75th pct.)')
+    ax.plot(NOISE_SCALES, bounds, color=COLOR_BOUND, marker='^',
+            label=r'Theoretical limit: Van Trees bound $\mathrm{Tr}(B_S)$', zorder=3)
+    ax.plot(NOISE_SCALES, medians, color=COLOR_EMPIRICAL, marker='o',
+            label='What a real estimator achieves (median)', zorder=4)
+    ax.fill_between(NOISE_SCALES, lo, hi, color=COLOR_EMPIRICAL, alpha=0.15,
+                     label='Middle 50% of trials (IQR)')
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel(r'Measurement-noise scale $\sigma^2$')
-    ax.set_ylabel('Squared error')
-    ax.set_title('Bound vs. achieved error (median), S = G', fontsize=9)
-    ax.legend(fontsize=7)
+    ax.set_ylabel('Squared estimation error')
+    ax.set_title('Does the bound actually hold?', fontsize=12.5)
+    ax.legend(fontsize=9.5, loc='lower right', framealpha=0.95)
     ax.grid(alpha=0.3)
 
     ax = axes[1]
     ratio = medians / bounds
-    ax.plot(NOISE_SCALES, ratio, color='#2ca02c', marker='s')
-    ax.axhline(1.0, color='gray', linestyle='--', linewidth=1)
+    ax.plot(NOISE_SCALES, ratio, color='#333333', marker='s')
+    ax.axhline(1.0, color='gray', linestyle='--', linewidth=1.5)
+    ax.text(NOISE_SCALES[0], 1.15, 'bound would be exact here', fontsize=9, color='#666666')
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel(r'Measurement-noise scale $\sigma^2$')
-    ax.set_ylabel('Median SE / Tr(B_S)')
-    ax.set_title('Tightness ratio (1.0 = exact)', fontsize=9)
+    ax.set_ylabel('Achieved error ÷ bound\n(1.0 = bound is exact)')
+    ax.set_title('How loose is the bound in practice?', fontsize=12.5)
     ax.grid(alpha=0.3)
 
-    fig.suptitle(f'Remark 1 check (CDCRevised/, N={N_TRIALS}/point, MAP estimator, S=G, median-based)')
-    fig.tight_layout()
-    fig.savefig(perf_dir + 'remark1_mse_vs_bound.png', dpi=150)
+    fig.suptitle('Supplementary check: does a real estimator reach the bound?', y=0.97, fontsize=15)
+    fig.text(0.5, 0.90,
+              f'Exploratory, not part of the paper (S = full sensor set, MAP estimator, '
+              f'N={N_TRIALS} trials/point). The bound is never violated, but a naive '
+              f'estimator does not reliably approach it.',
+              ha='center', fontsize=9.5, color='#555555')
+    fig.tight_layout(rect=[0, 0, 1, 0.86])
+    fig.savefig(perf_dir + 'remark1_mse_vs_bound.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}remark1_mse_vs_bound.png")
 
 
+CACHE_PATH = pkl_dir + 'mse_vs_bound_cache.npz'
+
+
+def load_cache():
+    """Reuse a prior run's raw per-trial results when only replotting (this experiment's multi-start
+    Newton-CG sweep takes several minutes; the plot styling should be iterable without repaying that)."""
+    d = np.load(CACHE_PATH)
+    all_errors = [d[f'sq_errors_{i}'] for i in range(len(NOISE_SCALES))]
+    return d['bounds'], all_errors
+
+
+def save_cache(bounds, all_errors):
+    payload = {'bounds': bounds}
+    for i, e in enumerate(all_errors):
+        payload[f'sq_errors_{i}'] = e
+    np.savez(CACHE_PATH, **payload)
+
+
 if __name__ == "__main__":
-    bounds, all_errors = run_sweep()
+    import sys
+    if '--replot' in sys.argv:
+        bounds, all_errors = load_cache()
+    else:
+        bounds, all_errors = run_sweep()
+        save_cache(bounds, all_errors)
     make_plot(bounds, all_errors)
 
     medians = np.array([np.median(e) for e in all_errors])

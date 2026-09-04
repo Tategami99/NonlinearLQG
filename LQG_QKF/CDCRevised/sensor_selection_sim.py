@@ -34,13 +34,18 @@ cache_dir = test_dir + 'cache/'
 for d in (pkl_dir, perf_dir, cache_dir):
     os.makedirs(d, exist_ok=True)
 
+# Okabe-Ito-based, colorblind-validated (see Timeline.md "figure redesign" entry --
+# scripts/validate_palette.js from Claude's dataviz skill flagged the old orange/green pair used
+# together in Fig. 2 as CVD-indistinguishable, deltaE 0.7 for protanopia). Meaning is consistent
+# across figures: dark gray = ground truth/reference, blue = the proposed method or bound, vermillion
+# = the comparison baseline or prior-work bound.
 COLORS = {
-    'quad': '#1f77b4',   # blue: proposed greedy quadratic method
-    'lin': '#d62728',    # red: linearized greedy baseline
-    'brute': '#2ca02c',  # green (dashed): brute-force optimal
-    'thm2': '#ff7f0e',   # orange: proposed Theorem 2 bound
-    'empirical': '#1f77b4',  # blue: empirical gamma_h
-    'prior': '#2ca02c',  # green (dashed): [19]'s restricted-case bound
+    'quad': '#0072B2',      # blue: proposed greedy quadratic method
+    'lin': '#D55E00',       # vermillion: linearized greedy baseline
+    'brute': '#333333',     # dark gray (dashed): brute-force optimal reference
+    'thm2': '#0072B2',      # blue: proposed Theorem 2 bound (Woodbury)
+    'empirical': '#333333',  # dark gray: empirical (true) gamma_h
+    'prior': '#D55E00',     # vermillion: [19]'s restricted-case bound
 }
 
 

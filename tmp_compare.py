@@ -2,7 +2,7 @@ import os
 import pickle as pkl
 import numpy as np
 
-base = r"D:\AC\UCLA\ECE\UCLA_LEMUR\nonlinear_LQG\LQG_QKF\CDC"
+base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "LQG_QKF", "CDC")
 
 print("SIM TEST")
 sim = os.path.join(base, "sim_test", "pkl")

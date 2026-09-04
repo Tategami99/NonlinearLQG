@@ -5,6 +5,11 @@ LQG_QKF/CDC/generate_figures.py exactly except for the bound function used in Fi
 independently here (fresh random draws) rather than reused, per the folder's self-containment.
 
 N_FIG1/N_FIG2 = 300, matching the paper's stated Fig. 1 sample size (Sec. V: "300 simulations").
+
+Presentation styling (fonts, colors, titles/labels aimed at a reader unfamiliar with the paper's
+notation) follows the redesign documented in Timeline.md's "figure redesign for supervisor review"
+entry -- colors are the CVD-validated palette from sensor_selection_sim.py's COLORS dict; see that
+file's comment for the validation method (Claude's dataviz skill / scripts/validate_palette.js).
 """
 
 import numpy as np
@@ -19,6 +24,19 @@ from sensor_selection_sim import (
     theorem2_bound_woodbury, prior_bound_c19, empirical_gamma_h, F_of,
     perf_dir, COLORS,
 )
+
+plt.rcParams.update({
+    'font.size': 13,
+    'axes.titlesize': 14,
+    'axes.labelsize': 14,
+    'xtick.labelsize': 12,
+    'ytick.labelsize': 12,
+    'legend.fontsize': 12,
+    'figure.titlesize': 17,
+    'axes.linewidth': 1.0,
+    'lines.linewidth': 2.4,
+    'lines.markersize': 8,
+})
 
 N_FIG1 = 300         # paper's stated sample size (CDC2026.tex Sec. V: "300 simulations")
 N_FIG2 = 300         # paper doesn't state Fig. 2's N explicitly; matched to Fig. 1's for consistency
@@ -75,20 +93,24 @@ def generate_fig1():
     quad_mean, quad_std = np.array(quad_mean), np.array(quad_std)
     lin_mean, lin_std = np.array(lin_mean), np.array(lin_std)
 
-    fig, ax = plt.subplots(figsize=(6, 4.2))
-    ax.axhline(1.0, color=COLORS['brute'], linestyle='--', label='Brute-force optimal', linewidth=1.5)
-    ax.plot(R_ratios, lin_mean, color=COLORS['lin'], marker='s', label='Linearized greedy baseline [9]')
+    fig, ax = plt.subplots(figsize=(10, 6.2))
+    ax.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2,
+               label='Optimal (brute force)', zorder=1)
+    ax.plot(R_ratios, lin_mean, color=COLORS['lin'], marker='s',
+            label='Baseline: linearized greedy [9]', zorder=3)
     ax.fill_between(R_ratios, lin_mean - lin_std, lin_mean + lin_std, color=COLORS['lin'], alpha=0.15)
-    ax.plot(R_ratios, quad_mean, color=COLORS['quad'], marker='o', label='Proposed greedy quadratic')
+    ax.plot(R_ratios, quad_mean, color=COLORS['quad'], marker='o',
+            label='Proposed: quadratic-aware greedy', zorder=4)
     ax.fill_between(R_ratios, quad_mean - quad_std, quad_mean + quad_std, color=COLORS['quad'], alpha=0.15)
     ax.set_xscale('log')
-    ax.set_xlabel(r'Target accuracy ratio $R_{\mathrm{ratio}}$')
-    ax.set_ylabel(r'Sensor utilization ratio $\ell/|S^\star|$')
-    ax.set_title(f'Fig. 1 (CDCRevised/, N={N_FIG1}/point): utilization ratio vs. target accuracy')
-    ax.legend(fontsize=8)
+    ax.set_xlabel(r'Target accuracy ratio $R_{\mathrm{ratio}}$  (smaller = stricter accuracy requirement)')
+    ax.set_ylabel(r'Sensors used vs. optimal, $\ell/|S^\star|$  (1.0 = optimal)')
+    ax.legend(loc='upper left', framealpha=0.95)
     ax.grid(alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(perf_dir + 'fig1.png', dpi=150)
+    fig.suptitle('Fewer sensors needed with quadratic-aware selection', y=0.98, fontsize=16)
+    ax.set_title(f'N={N_FIG1} trials/point, shaded band = ±1 std. dev.', fontsize=11, color='#555555', pad=10)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.savefig(perf_dir + 'fig1.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}fig1.png")
     return R_ratios, quad_mean, lin_mean
@@ -143,27 +165,36 @@ def generate_fig2():
     left = sweep_panel('C_scale', c_scales, fixed_C_scale=None, fixed_noise_scale=NOISE_SCALE_FIG1, rng=rng)
     right = sweep_panel('noise_scale', noise_scales, fixed_C_scale=10.0, fixed_noise_scale=None, rng=rng)
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4.2))
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6.3))
     for ax, xvals, data, xlabel, title in [
-        (axes[0], c_scales, left, 'C scale (linear-term magnitude)', 'Left: vary linear-term scale'),
-        (axes[1], noise_scales, right, r'Noise scale for $\sigma^2$', 'Right: vary noise scale'),
+        (axes[0], c_scales, left, 'Linear-term magnitude (C scale)',
+         'Varying the linear measurement term'),
+        (axes[1], noise_scales, right, r'Measurement-noise scale ($\sigma^2$)',
+         'Varying the measurement noise'),
     ]:
         emp_med, emp_lo, emp_hi, bound_med, prior_med = data
-        ax.plot(xvals, emp_med, color=COLORS['empirical'], marker='o', label=r'$\gamma_h$, empirical')
-        ax.fill_between(xvals, emp_lo, emp_hi, color=COLORS['empirical'], alpha=0.15)
-        ax.plot(xvals, bound_med, color=COLORS['thm2'], marker='^', label='Proposed Theorem 2 bound (Woodbury)')
+        ax.plot(xvals, emp_med, color=COLORS['empirical'], marker='o', linewidth=2.6,
+                 label='True ratio (exhaustive computation)', zorder=4)
+        ax.fill_between(xvals, emp_lo, emp_hi, color=COLORS['empirical'], alpha=0.12)
+        ax.plot(xvals, bound_med, color=COLORS['thm2'], marker='^',
+                 label='Proposed guarantee (Theorem 2, Woodbury)', zorder=3)
         ax.plot(xvals, prior_med, color=COLORS['prior'], marker='s', linestyle='--',
-                 label="[19]'s restricted-case bound")
+                 label="Prior-work guarantee [19]", zorder=2)
         ax.set_xscale('log')
         ax.set_yscale('log')
         ax.set_xlabel(xlabel)
-        ax.set_ylabel('Supermodularity ratio')
-        ax.set_title(title, fontsize=9)
-        ax.legend(fontsize=7)
+        ax.set_ylabel(r'Supermodularity ratio $\gamma_h$' + '\n(higher = tighter guarantee)')
+        ax.set_title(title, fontsize=13)
+        ax.legend(loc='lower right', framealpha=0.95, fontsize=10.5)
         ax.grid(alpha=0.3)
-    fig.suptitle(f'Fig. 2 (CDCRevised/, Woodbury bound, N={N_FIG2}/point, R_ratio={R_RATIO})')
-    fig.tight_layout()
-    fig.savefig(perf_dir + 'fig2.png', dpi=150)
+    fig.suptitle('How tight is the theoretical guarantee? (Woodbury bound)', y=1.0)
+    fig.text(0.5, 0.925,
+              f'All three curves are lower bounds on how close greedy selection gets to optimal -- '
+              f'higher is a tighter, more useful guarantee. N={N_FIG2} trials/point, '
+              rf'$R_\mathrm{{ratio}}={R_RATIO}$.',
+              ha='center', fontsize=10.5, color='#555555')
+    fig.tight_layout(rect=[0, 0, 1, 0.89])
+    fig.savefig(perf_dir + 'fig2.png', dpi=200)
     plt.close(fig)
     print(f"Saved {perf_dir}fig2.png")
     return c_scales, noise_scales, left, right

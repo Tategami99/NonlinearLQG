@@ -687,22 +687,22 @@ $M^{(i)}$. Prior work \cite{c19} already shows that the A-optimality objective i
 
 In this section, we evaluate the measurement-utilization performance of greedy selection under the quadratic observation model and validate the proposed lower-bound analysis of the supermodularity ratio.
 
-In Fig.~1, we evaluate the performance-constrained measurement-selection framework under quadratic observation models. We use 300 simulations with different parameter settings to compute the mean and variance. The simulations are performed with state dimension $n=4$, number of measurements $m=7$, initial covariance $10 \times I$, randomly generated full-rank quadratic-term $M^{(i)}$ scales sampled from $[10^{-2},1]$, and measurement-noise with scale $10^{2}$. The horizontal axis reports the target-accuracy ratio $R_{\mathrm{ratio}}:=R/h(\varnothing)$, varied over the range $10^{-3}$ to $1$, where smaller values correspond to stricter accuracy requirements and larger values correspond to looser constraints. The vertical axis shows the sensor-utilization ratio $\ell/|S^\star|$, where $\ell$ is the number of measurements selected by each greedy method and $|S^\star|$ is the optimal subset size obtained by brute force. For comparison, we implement the linearized greedy baseline from \cite{c9}, represented by the red curve, which requires substantially more measurements in our simulations, especially as the target ratio becomes much stricter. This result shows that greedy selection based on the proposed quadratic objective, represented by the blue curve, requires less sensor utilization and is more closely aligned with the original nonlinear observation model than the linearization-based method.
+In Fig.~1, we evaluate the performance-constrained measurement-selection framework under quadratic observation models. We use 300 simulations with different parameter settings to compute the mean and variance. The simulations are performed with state dimension $n=4$, number of measurements $m=7$, initial covariance $10 \times I$, randomly generated full-rank quadratic-term $M^{(i)}$ scales sampled from $[10^{-2},1]$, and measurement-noise with scale $10^{2}$. The horizontal axis reports the target-accuracy ratio $R_{\mathrm{ratio}}:=R/h(\varnothing)$, varied over the range $10^{-3}$ to $1$, where smaller values correspond to stricter accuracy requirements and larger values correspond to looser constraints. The vertical axis shows the sensor-utilization ratio $\ell/|S^\star|$, where $\ell$ is the number of measurements selected by each greedy method and $|S^\star|$ is the optimal subset size obtained by brute force. For comparison, we implement the linearized greedy baseline from \cite{c9}, represented by the orange-red curve, which requires substantially more measurements in our simulations, especially as the target ratio becomes much stricter. This result shows that greedy selection based on the proposed quadratic objective, represented by the blue curve, requires less sensor utilization and is more closely aligned with the original nonlinear observation model than the linearization-based method.
 
 \begin{figure}[h]
     % No \centering or \raggedleft here
     \vspace*{-2mm}
     \hspace*{-2mm} % Adjust the length (e.g., 2cm) as needed
     \begin{subfigure}{\linewidth}
-        \includegraphics[width=1.02\linewidth]{fig1.png}
+        \includegraphics[width=1.02\linewidth]{sensor_selection_test/perf/fig1.png}
         \label{fig:subfig1}
     \end{subfigure}
     \vspace*{-6mm}
-    \caption{\small Sensor utilization ratio versus target accuracy ratio. (Red) mean and variance by the linearized greedy baseline \cite{c9}. (Blue) Mean and variance by the proposed greedy quadratic model.}
+    \caption{\small Sensor utilization ratio versus target accuracy ratio. (Orange-red) mean and variance by the linearized greedy baseline \cite{c9}. (Blue) Mean and variance by the proposed greedy quadratic model.}
     \label{fig:mainfig}
 \end{figure}
 
-To evaluate the supermodularity-ratio analysis in Theorem~2, Fig.~2 compares the empirical supermodularity ratio with the proposed lower bound under two parameter sweeps using Monte Carlo simulations. Here, we fix $R_{\mathrm{ratio}}=0.01$ and keep the other parameters unchanged. We compute the empirical supermodularity ratio $\gamma_h$, the proposed bound from Theorem~2 (orange), and the bound from~\cite{c19} (green). The plotted curves show the median across valid trials, and the shaded regions indicate the empirical variance range. In the left panel, we vary the scale of the linear measurement term over $[10^{-2}, 10]$ while keeping the other parameters fixed. As the linear-term scale increases, the observation model moves farther from the restrictive pure-quadratic setting considered in previous work. The empirical supermodularity ratio remains above the proposed lower bound across the full sweep, confirming that the proposed bound serves as a valid conservative certificate. Unlike the previous bound, the proposed analysis explicitly captures the effect of the linear term through the $c_j$-dependent terms in the lower-bound expression, and thus remains applicable to the broader mixed linear-quadratic model.
+To evaluate the supermodularity-ratio analysis in Theorem~2, Fig.~2 compares the empirical supermodularity ratio with the proposed lower bound under two parameter sweeps using Monte Carlo simulations. Here, we fix $R_{\mathrm{ratio}}=0.01$ and keep the other parameters unchanged. We compute the empirical supermodularity ratio $\gamma_h$ (dark gray), the proposed bound from Theorem~2 (blue), and the bound from~\cite{c19} (orange-red). The plotted curves show the median across valid trials, and the shaded regions indicate the empirical variance range. In the left panel, we vary the scale of the linear measurement term over $[10^{-2}, 10]$ while keeping the other parameters fixed. As the linear-term scale increases, the observation model moves farther from the restrictive pure-quadratic setting considered in previous work. The empirical supermodularity ratio remains above the proposed lower bound across the full sweep, confirming that the proposed bound serves as a valid conservative certificate. Unlike the previous bound, the proposed analysis explicitly captures the effect of the linear term through the $c_j$-dependent terms in the lower-bound expression, and thus remains applicable to the broader mixed linear-quadratic model.
 
 
 
@@ -710,10 +710,10 @@ In the right panel, we evaluate the proposed lower bound under a sweep of the me
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{fig4.png}
+    \includegraphics[width=\linewidth]{sensor_selection_test/perf/fig2.png}
     \vspace*{-6mm}
     \caption{\small Empirical supermodularity ratio $\gamma_h$ and theoretical lower bounds under parameter sweeps. (Left): varying the linear-term scale of $C$. (Right): varying the measurement-noise scale $\sigma^2$.}
-    \label{fig:mainfig}
+    \label{fig:supmodfig}
 \end{figure}
 
 %Overall, the simulations support both the algorithmic and
