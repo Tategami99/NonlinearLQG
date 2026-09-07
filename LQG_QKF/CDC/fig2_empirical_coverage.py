@@ -25,7 +25,7 @@ everywhere makes it look like they have a (worse) answer at every point; the poi
 that they have no proven answer at all outside their one case, which is a different and more accurate
 claim than "worse."
 
-Five figures, all computed from real Monte Carlo / exhaustive-brute-force data:
+Ten figures, all computed from real Monte Carlo / exhaustive-brute-force data:
 
   1. fig2_emp1_coverage_vs_C.png       -- sweep linear-term magnitude C from 0 upward at full-rank M;
      this paper's bound + brute-force truth plotted throughout; the prior paper's bound plotted only at
@@ -45,6 +45,46 @@ Five figures, all computed from real Monte Carlo / exhaustive-brute-force data:
   5. fig2_emp5_validation_histogram.png -- large-N (1000 trials) falsification test: this paper's bound
      minus the brute-force-true ratio, at full-rank M with randomized nonzero C and randomized noise.
      Never positive (never a violation).
+  6. fig2_emp6_selection_cost_vs_C.png -- BOTH stories in one graph, requested explicitly by the user
+     after reviewing 1-5: sensor-utilization ratio ell/|S*| vs. growing C (same metric as the paper's own
+     Fig. 1), comparing this paper's quadratic-aware greedy (stays at the optimal ratio throughout) against
+     greedy selection driven entirely by the prior paper's rank-1/zero-linear-term view of each sensor
+     (needs up to ~70% more sensors than optimal as C grows, since it is blind to the growing linear-term
+     information). This is NOT a claim that the prior paper's bound produces an invalid NUMBER -- see the
+     note below on why that specific claim could not be substantiated -- it is a real, measured, practical
+     consequence of relying on their restricted model for an actual decision (how many sensors to buy).
+  7. fig2_emp7_breakdown_vs_C.png      -- single-sensor information-content check: this paper's bound
+     stays present and valid (top panel, matches fig2_emp1's story) while, in the same figure, the prior
+     paper's own restricted machinery increasingly mis-predicts one sensor's true information content as
+     C grows (bottom panel) -- two coordinated panels sharing the same x-axis, one guarantee working and
+     one representation failing, side by side.
+  8. fig2_emp8_domain_map.png          -- 2D domain map over BOTH generality axes at once: rank of M^(i)
+     (1 to 4, state dimension 4) on one axis, linear-term magnitude C on the other. Every cell in the
+     full-rank row is real computed data for this paper's Theorem 2 at every tested C; only the single
+     rank-1/C=0 cell is real data for the prior paper's explicit bound; every other cell (including every
+     intermediate rank) is marked "NO PROVEN BOUND" rather than computed anyway. The most literal one-grid
+     answer to "show ours works and theirs doesn't in the same graph," extended to the rank axis, not just C.
+  9. fig2_emp9_condition_number_robustness.png -- stress-tests that "full rank" really does mean ANY
+     full-rank M, not just the moderately-scaled ones used elsewhere in this file: sweeps M's condition
+     number from 1 (isotropic) to 1e6 (nearly singular but still technically full rank) at fixed nonzero
+     C. This paper's bound tracks truth throughout; the prior paper's bound is not evaluated anywhere on
+     this axis, since none of these matrices are rank-1.
+  10. fig2_emp10_domain_side_by_side.png -- the rank axis made explicit as two side-by-side panels sharing
+     the same C-sweep: left panel holds M^(i) at rank-1 throughout (their exact hypothesis -- this paper's
+     Theorem 2 has nothing to plot there at all), right panel holds M^(i) at full rank throughout (this
+     paper's exact hypothesis -- their bound has nothing beyond the marked C=0 point). Complements Figure
+     8's grid with a line-plot version that makes rank, not just C, something the reader watches change.
+
+**On "does the prior paper's bound ever produce an invalid number as C grows" -- tested extensively,
+answer is no, not fabricated for effect.** Beyond the ~1,000-trial stress test already recorded earlier in
+`CDC/Timeline.md`, this session re-tested a further ~1,400 trials specifically trying to make
+`prior_bound_c19()` exceed the true ratio by evaluating it on a rank-1/C=0 *approximation* of the same
+general sensors being compared against (i.e. giving their formula every reasonable chance to be misapplied
+in a way that would break it) -- across isotropic full-rank M, near-rank-1 full-rank M, and highly
+heterogeneous random model/noise draws. Zero violations in all of it. The formula appears to be a
+genuinely robust (if unproven-here and often extremely conservative) bound in practice, not merely lucky
+in the first test. Figures 6 and 7 above show real breakdown/cost, just not in the specific form of "their
+bound gives an invalid number" -- that claim is not something this repo can honestly make.
 """
 
 import numpy as np
@@ -54,11 +94,12 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from sensor_selection_sim import (
-    generate_C, per_sensor_info, F_of,
+    generate_C, per_sensor_info, F_of, h_val,
+    greedy_select, brute_force_select,
     theorem2_bound, prior_bound_c19, empirical_gamma_h,
     perf_dir, COLORS,
 )
-from fig2_reframe import add_caption
+from fig2_reframe import add_caption, restrict_Ii_list, restrict_to_rank1_zero_c, marginal_gain_first_sensor
 
 plt.rcParams.update({
     'font.size': 13,
@@ -431,9 +472,435 @@ def fig2_emp5_validation_histogram(n_trials=1000):
     print(f"  violations: {n_violations}/{n_trials}, min log10(true/bound): {log_ratios.min():.6g}")
 
 
+# --------------------------------------------------------------------------------------
+# Figure 6: BOTH stories in one graph -- sensor-utilization cost of the restricted view, vs. growing C
+# --------------------------------------------------------------------------------------
+
+def fig2_emp6_selection_cost_vs_C(n_trials=150, R_ratio=0.2):
+    """Deliberately NOT a line plot -- an earlier version of this figure used the exact same line/band/
+    dashed-optimal-reference style as the paper's own Figure 1 (same y-axis metric, same visual grammar),
+    and the user flagged it as looking like a re-skin of Figure 1 rather than a distinct figure. The
+    underlying comparison was already different (Figure 1 sweeps R_ratio and compares against a fully
+    LINEARIZED baseline that drops all of M; this one holds R_ratio fixed and sweeps C against a baseline
+    that keeps a RANK-1 approximation of M but drops C -- the prior paper's own restriction, not a
+    linearization) -- but the chart type made that distinction invisible. Switched to grouped bars at a
+    handful of representative C values, showing raw sensor COUNTS (not a ratio to optimal), which is both
+    visually distinct from Figure 1 and arguably more concrete for a reader (a literal "how many sensors
+    would you actually buy" number)."""
+    rng = np.random.default_rng(106)
+    C_scales = np.array([0.0, 0.75, 1.5, 2.25, 3.0])
+
+    star_mean, star_std, quad_mean, quad_std, restr_mean, restr_std = [], [], [], [], [], []
+    for C_scale in tqdm(C_scales, desc="selection-cost-vs-C"):
+        star_counts, quad_counts, restr_counts = [], [], []
+        for _ in range(n_trials):
+            P = np.eye(N_STATE) * P_SCALE
+            Ix = np.linalg.inv(P)
+            M = make_M_stack_with_rank(M_SENSORS, N_STATE, N_STATE, 1e-2, 1.0, rng)  # full rank always
+            C = np.zeros((M_SENSORS, N_STATE)) if C_scale == 0 else generate_C(M_SENSORS, N_STATE, C_scale)
+            sigma2_vec = np.full(M_SENSORS, SIGMA2)
+            Ii_true, ci_true = per_sensor_info(M, C, P, sigma2_vec)
+            Ii_restr = restrict_Ii_list(M, sigma2_vec, P)
+            R = R_ratio * np.trace(P)
+            S_star, _ = brute_force_select(M_SENSORS, Ix, Ii_true, R)
+            if len(S_star) == 0:
+                continue
+            S_quad = greedy_select(M_SENSORS, Ix, Ii_true, R)
+            S_restr = greedy_select(M_SENSORS, Ix, Ii_restr, R)
+            star_counts.append(len(S_star))
+            quad_counts.append(len(S_quad))
+            restr_counts.append(len(S_restr))
+        star_mean.append(np.mean(star_counts)); star_std.append(np.std(star_counts))
+        quad_mean.append(np.mean(quad_counts)); quad_std.append(np.std(quad_counts))
+        restr_mean.append(np.mean(restr_counts)); restr_std.append(np.std(restr_counts))
+    star_mean, star_std = np.array(star_mean), np.array(star_std)
+    quad_mean, quad_std = np.array(quad_mean), np.array(quad_std)
+    restr_mean, restr_std = np.array(restr_mean), np.array(restr_std)
+
+    fig, ax = plt.subplots(figsize=(10.5, 8.3))
+    x = np.arange(len(C_scales))
+    width = 0.26
+    err_kw = dict(capsize=4, elinewidth=1.3, ecolor='#333333')
+    ax.bar(x - width, star_mean, width, yerr=star_std, color=NA_GRAY, label='Optimal (brute force)', error_kw=err_kw)
+    ax.bar(x, quad_mean, width, yerr=quad_std, color=COLORS['thm2'],
+           label='This paper: quadratic-aware greedy', error_kw=err_kw)
+    ax.bar(x + width, restr_mean, width, yerr=restr_std, color=COLORS['prior'],
+           label="Greedy driven by the prior paper's rank-1/zero-$C$ view", error_kw=err_kw)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f'$C={c:g}$' for c in C_scales])
+    ax.set_xlabel(r'Linear-term magnitude $C$ (full-rank $M^{(i)}$ throughout)', fontsize=12.5)
+    ax.set_ylabel('Sensors selected (count)')
+    ax.set_title(f'Fixed target accuracy ($R_\\mathrm{{ratio}}={R_ratio}$), $C$ grows', fontsize=13)
+    ax.grid(alpha=0.3, axis='y')
+    fig.suptitle('This paper matches the optimal sensor count as $C$ grows; the restricted view does not', y=0.975, fontsize=14)
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.18), ncol=1,
+               fontsize=10.5, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.26, 1, 0.90])
+    add_caption(
+        fig, 'Empirical 6',
+        "Both guarantees in one graph, as raw sensor counts: ours matches optimal as C grows; theirs overshoots.",
+        f"Mean sensor count over N={n_trials} trials/group (error bars = 1 std. dev.), full-rank $M^{{(i)}}$ "
+        f"throughout, fixed target $R_\\mathrm{{ratio}}={R_ratio}$. At $C=0$ all three methods pick nearly "
+        "the same count, since that matches the prior paper's own case. As $C$ grows, this paper's method "
+        "keeps tracking the brute-force optimal count, while greedy selection driven by the prior paper's "
+        "rank-1/zero-$C$ view of each sensor overshoots it by roughly 70% at the largest $C$ tested, "
+        "because it cannot see the growing linear-term information at all.",
+    )
+    fig.savefig(perf_dir + 'fig2_emp6_selection_cost_vs_C.png', dpi=200)
+    plt.close(fig)
+    print(f"Saved {perf_dir}fig2_emp6_selection_cost_vs_C.png")
+
+
+# --------------------------------------------------------------------------------------
+# Figure 7: two coordinated panels -- our guarantee working, their representation failing, vs. growing C
+# --------------------------------------------------------------------------------------
+
+def fig2_emp7_breakdown_vs_C(n_trials=150):
+    rng = np.random.default_rng(107)
+    C_scales = np.array([0.0, 0.3, 0.6, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+    # Top panel: same coverage-vs-C data as Figure 1 (freshly computed here to keep this figure
+    # self-contained rather than re-importing saved numbers).
+    true_med, true_lo, true_hi, ours_med, ours_lo, ours_hi = sweep_vs_C(C_scales, SIGMA2, n_trials, rng)
+    prior_val = prior_at_rank1_c0(n_trials, rng)
+
+    # Bottom panel: M is held at RANK-1 throughout (the prior paper's own exact hypothesis, unlike the
+    # top panel which needs full-rank M) so that C=0 reproduces their case exactly (ratio=1.0) and the
+    # only thing changing along the x-axis is C -- this isolates C's effect on their representation
+    # cleanly, rather than confounding it with a pre-existing rank mismatch. Same construction as
+    # fig2_reframe.py's Candidate 2 (`c_sweep_trial`), single-sensor and C-only here.
+    pred_med, pred_lo, pred_hi = [], [], []
+    for C_scale in tqdm(C_scales, desc="breakdown-vs-C"):
+        ratios = []
+        for _ in range(n_trials):
+            P = np.eye(N_STATE) * P_SCALE
+            Q, _ = np.linalg.qr(rng.normal(size=(N_STATE, N_STATE)))
+            Mj = Q @ np.diag([1.0] + [0.0] * (N_STATE - 1)) @ Q.T  # exactly rank-1
+            if C_scale > 0:
+                direction = rng.normal(size=(N_STATE, 1))
+                cj = direction / np.linalg.norm(direction) * C_scale
+            else:
+                cj = np.zeros((N_STATE, 1))
+            Mj_approx = restrict_to_rank1_zero_c(Mj)
+            true_gain = marginal_gain_first_sensor(Mj, cj, P, SIGMA2)
+            approx_gain = marginal_gain_first_sensor(Mj_approx, np.zeros((N_STATE, 1)), P, SIGMA2)
+            ratios.append(approx_gain / true_gain)
+        pred_med.append(np.median(ratios)); pred_lo.append(np.percentile(ratios, 25)); pred_hi.append(np.percentile(ratios, 75))
+    pred_med, pred_lo, pred_hi = np.array(pred_med), np.array(pred_lo), np.array(pred_hi)
+
+    fig, axes = plt.subplots(2, 1, figsize=(9.5, 12.8), sharex=True)
+
+    ax = axes[0]
+    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.12, zorder=0, hatch='//')
+    ax.plot(C_scales, true_med, color=COLORS['empirical'], marker='o', label='True ratio (brute force)', zorder=3)
+    ax.fill_between(C_scales, true_lo, true_hi, color=COLORS['empirical'], alpha=0.12)
+    ax.plot(C_scales, ours_med, color=COLORS['thm2'], marker='^', label='This paper (Theorem 2)', zorder=4)
+    ax.fill_between(C_scales, ours_lo, ours_hi, color=COLORS['thm2'], alpha=0.15)
+    ax.scatter([0.0], [prior_val], s=180, color=COLORS['prior'], zorder=5, edgecolor='white', linewidth=1.4,
+               label="Prior paper's bound (only where proven)")
+    ax.set_yscale('log')
+    ax.set_ylabel(r'Supermodularity ratio $\gamma_h$', fontsize=12)
+    ax.set_title('Top: our guarantee stays valid and present as $C$ grows', fontsize=12.5)
+    ax.grid(alpha=0.3)
+    ax.legend(loc='center right', fontsize=9.5, framealpha=0.95)
+
+    ax = axes[1]
+    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.12, zorder=0, hatch='//')
+    ax.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Perfect representation', zorder=2)
+    ax.plot(C_scales, pred_med, color=COLORS['prior'], marker='s', zorder=3,
+            label="Prior paper's rank-1/zero-$C$ prediction of the sensor")
+    ax.fill_between(C_scales, pred_lo, pred_hi, color=COLORS['prior'], alpha=0.15)
+    ax.set_xlabel(r'Linear-term magnitude $C$ ($M^{(i)}$ held at rank-1: their own case)', fontsize=12.5)
+    ax.set_ylabel('Predicted / true\ninformation content', fontsize=11.5)
+    ax.set_title("Bottom: their representation of the same sensor degrades as $C$ grows", fontsize=12.5)
+    ax.grid(alpha=0.3)
+    ax.legend(loc='upper right', fontsize=9.5, framealpha=0.95)
+
+    fig.suptitle('One works, one degrades: the same growing-$C$ axis, two coordinated panels', y=0.975, fontsize=14.5)
+    fig.tight_layout(rect=[0, 0.155, 1, 0.94])
+    add_caption(
+        fig, 'Empirical 7',
+        "Top and bottom panels share the same x-axis: this paper's guarantee holds throughout while the prior paper's own representation of a sensor breaks down.",
+        f"Median over N={n_trials} trials/point (bands = IQR). Top panel: same result as Figure "
+        "Empirical 1, full-rank $M^{(i)}$ throughout (this paper's own domain). Bottom panel: a "
+        "different, independent check, with $M^{(i)}$ held at exactly rank-1 (the prior paper's own "
+        "domain, not this paper's) so $C=0$ reproduces their case exactly -- only $C$ changes along the "
+        "x-axis, isolating its effect. The two panels are not the same quantity, but they tell the same "
+        "story on the same axis: presence and validity for this paper as $C$ grows, versus a "
+        "representation that increasingly cannot see what is really there for the prior paper.",
+        y=0.02,
+    )
+    fig.savefig(perf_dir + 'fig2_emp7_breakdown_vs_C.png', dpi=200)
+    plt.close(fig)
+    print(f"Saved {perf_dir}fig2_emp7_breakdown_vs_C.png")
+
+
+# --------------------------------------------------------------------------------------
+# Figure 8: 2D domain map over (rank of M, linear-term magnitude C) -- the joint claim, in one grid
+# --------------------------------------------------------------------------------------
+
+def fig2_emp8_domain_map(n_trials=100):
+    """The most literal answer to 'show ours works and theirs doesn't in the same graph,' extended to
+    BOTH generality axes at once (rank of M^(i) AND linear-term magnitude C), not just C alone like
+    Figures 1/2/6/7. Every prior empirical figure fixed M at full rank throughout and only swept C; this
+    one sweeps rank too, so the full-rank requirement is an explicit, tested axis of the figure, not just
+    an assumption baked into the setup."""
+    rng = np.random.default_rng(108)
+    C_scales = np.array([0.0, 0.75, 1.5, 2.25, 3.0])
+    ranks = list(range(1, N_STATE + 1))
+
+    true_grid = np.zeros((len(ranks), len(C_scales)))
+    bound_grid = np.full((len(ranks), len(C_scales)), np.nan)
+    status_grid = np.zeros((len(ranks), len(C_scales)), dtype=int)  # 0=neither proven, 1=ours, 2=theirs
+
+    for ri, rank in enumerate(tqdm(ranks, desc="domain-map")):
+        for ci, C_scale in enumerate(C_scales):
+            trues, bounds = [], []
+            for _ in range(n_trials):
+                P = np.eye(N_STATE) * P_SCALE
+                Ix = np.linalg.inv(P)
+                M = make_M_stack_with_rank(M_SENSORS, N_STATE, rank, 1e-2, 1.0, rng)
+                C = np.zeros((M_SENSORS, N_STATE)) if C_scale == 0 else generate_C(M_SENSORS, N_STATE, C_scale)
+                sigma2_vec = np.full(M_SENSORS, SIGMA2)
+                Ii_list, ci_list = per_sensor_info(M, C, P, sigma2_vec)
+                trues.append(empirical_gamma_h(M_SENSORS, Ix, Ii_list))
+                if rank == N_STATE:
+                    bounds.append(theorem2_bound(M_SENSORS, Ix, Ii_list, ci_list, M, sigma2_vec))
+                elif rank == 1 and C_scale == 0:
+                    F_full = F_of(list(range(M_SENSORS)), Ix, Ii_list)
+                    bounds.append(prior_bound_c19(M_SENSORS, Ix, P, sigma2_vec, F_full))
+            true_grid[ri, ci] = np.median(trues)
+            if rank == N_STATE:
+                status_grid[ri, ci] = 1
+                bound_grid[ri, ci] = np.median(bounds)
+            elif rank == 1 and C_scale == 0:
+                status_grid[ri, ci] = 2
+                bound_grid[ri, ci] = np.median(bounds)
+
+    from matplotlib.patches import Rectangle, Patch
+    fig, ax = plt.subplots(figsize=(11, 8.6))
+    face = {0: NA_GRAY, 1: COLORS['thm2'], 2: COLORS['prior']}
+    alpha = {0: 0.18, 1: 0.32, 2: 0.32}
+    hatch = {0: '//', 1: None, 2: None}
+    for ri in range(len(ranks)):
+        for ci in range(len(C_scales)):
+            s = status_grid[ri, ci]
+            ax.add_patch(Rectangle((ci - 0.5, ri - 0.5), 1, 1, facecolor=face[s], alpha=alpha[s],
+                                    edgecolor='white', linewidth=2.5, hatch=hatch[s], zorder=1))
+            true_str = f"true={true_grid[ri, ci]:.3g}"
+            if s == 0:
+                label = f"{true_str}\nNO PROVEN\nBOUND"
+            else:
+                label = f"{true_str}\nbound={bound_grid[ri, ci]:.2g}"
+            ax.text(ci, ri, label, ha='center', va='center', fontsize=9.5,
+                     color='#1a1a1a' if s == 0 else 'white', fontweight='bold' if s != 0 else 'normal', zorder=2)
+
+    ax.set_xlim(-0.5, len(C_scales) - 0.5)
+    ax.set_ylim(-0.5, len(ranks) - 0.5)
+    ax.set_xticks(range(len(C_scales)))
+    ax.set_xticklabels([f'$C={c:g}$' for c in C_scales])
+    ax.set_yticks(range(len(ranks)))
+    ax.set_yticklabels([f'rank {r}' + ('  (full)' if r == N_STATE else '') for r in ranks])
+    ax.set_xlabel('Linear-term magnitude $C$', fontsize=13)
+    ax.set_ylabel('Rank of $M^{(i)}$ (state dimension = 4)', fontsize=13)
+    ax.set_title('Where is each bound actually proven to apply?', fontsize=13.5)
+    legend_handles = [
+        Patch(facecolor=COLORS['thm2'], alpha=0.32, edgecolor='white', label='This paper (Theorem 2): full rank, any $C$'),
+        Patch(facecolor=COLORS['prior'], alpha=0.32, edgecolor='white', label="Prior paper: rank-1, $C=0$ only"),
+        Patch(facecolor=NA_GRAY, alpha=0.18, hatch='//', edgecolor='white', label='Neither bound proven here'),
+    ]
+    fig.suptitle("Our bound's proven domain covers the full-rank row entirely; theirs is a single cell", y=0.975, fontsize=14.5)
+    fig.legend(handles=legend_handles, loc='lower center', bbox_to_anchor=(0.5, 0.16), ncol=1,
+               fontsize=10.5, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.24, 1, 0.90])
+    add_caption(
+        fig, 'Empirical 8',
+        "The joint (rank, C) domain, in one grid: this paper covers an entire row; the prior paper covers one cell.",
+        f"Median true (brute-force) $\\gamma_h$ and, where proven, each bound's median value, over N={n_trials} "
+        "trials per cell, state dimension 4, 7 sensors. Every cell in the full-rank row (top) is real data for "
+        "this paper's Theorem 2, at every tested $C$ from 0 to 3. Only the single rank-1/$C=0$ cell is real "
+        "data for the prior paper's explicit bound; the rest of that row, and every intermediate rank, has no "
+        "proven bound from either paper and is marked accordingly rather than computed anyway.",
+    )
+    fig.savefig(perf_dir + 'fig2_emp8_domain_map.png', dpi=200)
+    plt.close(fig)
+    print(f"Saved {perf_dir}fig2_emp8_domain_map.png")
+
+
+# --------------------------------------------------------------------------------------
+# Figure 9: robustness across M's conditioning, at fixed nonzero C, full rank throughout
+# --------------------------------------------------------------------------------------
+
+def make_M_stack_with_condition(m, n, condition, rng):
+    """m sensors, each n x n symmetric, full rank, with eigenvalues log-spaced from 1 to `condition`
+    (random orientation per sensor) -- so condition=1 is well-conditioned (isotropic) and large
+    condition is a nearly-singular-but-still-technically-full-rank M, stress-testing that 'full rank'
+    in Theorem 2 really does mean any full-rank M, not just nicely-conditioned ones."""
+    M = np.zeros((m, n, n))
+    eigs = np.ones(n) if condition <= 1 else np.logspace(0, np.log10(condition), n)
+    for i in range(m):
+        Q, _ = np.linalg.qr(rng.normal(size=(n, n)))
+        M[i] = Q @ np.diag(eigs) @ Q.T
+    return M
+
+
+def fig2_emp9_condition_number_robustness(n_trials=120):
+    """Every other figure's 'full rank M' used a fixed, moderate eigenvalue spread (scale in
+    [1e-2, 1.0]). This isolates conditioning as its own swept axis at fixed nonzero C, to check the
+    full-rank claim isn't quietly relying on M being well-behaved -- and to make explicit that the
+    prior paper's bound has literally nothing to plot here at all: not 'worse,' not 'looser,' but
+    undefined at every single point, since none of these M are rank-1."""
+    rng = np.random.default_rng(109)
+    conditions = np.array([1.0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6])
+    C_scale = 1.5
+
+    true_med, true_lo, true_hi, ours_med, ours_lo, ours_hi = [], [], [], [], [], []
+    for cond in tqdm(conditions, desc="condition-number-robustness"):
+        trues, ours = [], []
+        for _ in range(n_trials):
+            P = np.eye(N_STATE) * P_SCALE
+            Ix = np.linalg.inv(P)
+            M = make_M_stack_with_condition(M_SENSORS, N_STATE, cond, rng)
+            C = generate_C(M_SENSORS, N_STATE, C_scale)
+            sigma2_vec = np.full(M_SENSORS, SIGMA2)
+            Ii_list, ci_list = per_sensor_info(M, C, P, sigma2_vec)
+            trues.append(empirical_gamma_h(M_SENSORS, Ix, Ii_list))
+            ours.append(theorem2_bound(M_SENSORS, Ix, Ii_list, ci_list, M, sigma2_vec))
+        true_med.append(np.median(trues)); true_lo.append(np.percentile(trues, 25)); true_hi.append(np.percentile(trues, 75))
+        ours_med.append(np.median(ours)); ours_lo.append(np.percentile(ours, 25)); ours_hi.append(np.percentile(ours, 75))
+    true_med, true_lo, true_hi = np.array(true_med), np.array(true_lo), np.array(true_hi)
+    ours_med, ours_lo, ours_hi = np.array(ours_med), np.array(ours_lo), np.array(ours_hi)
+
+    fig, ax = plt.subplots(figsize=(9.5, 8.3))
+    ax.plot(conditions, true_med, color=COLORS['empirical'], marker='o', label='True ratio (brute force)', zorder=3)
+    ax.fill_between(conditions, true_lo, true_hi, color=COLORS['empirical'], alpha=0.12)
+    ax.plot(conditions, ours_med, color=COLORS['thm2'], marker='^', label='This paper (Theorem 2)', zorder=4)
+    ax.fill_between(conditions, ours_lo, ours_hi, color=COLORS['thm2'], alpha=0.15)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_ylim(top=max(true_hi.max(), ours_hi.max()) * 6)
+    ax.set_xlabel(r"$M^{(i)}$ condition number (max/min eigenvalue, full rank throughout)", fontsize=12.5)
+    ax.set_ylabel(r'Supermodularity ratio $\gamma_h$', fontsize=13)
+    ax.set_title(f'Fixed nonzero linear term ($C={C_scale}$); conditioning of $M$ grows', fontsize=13, pad=14)
+    ax.grid(alpha=0.3)
+    fig.suptitle("'Full rank' means any full-rank $M$: our bound holds from well-conditioned to nearly-singular", y=0.975, fontsize=14)
+    fig.text(0.5, 0.905, "Prior paper's bound: NOT DEFINED anywhere on this axis (every $M^{(i)}$ here is full rank, never rank-1)",
+              ha='center', va='center', fontsize=10.5, color='#555555', style='italic')
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0.18), ncol=1,
+               fontsize=10.5, framealpha=0.95)
+    fig.tight_layout(rect=[0, 0.26, 1, 0.85])
+    add_caption(
+        fig, 'Empirical 9',
+        "The full-rank claim isn't quietly relying on well-conditioned M: the bound tracks truth from condition number 1 to 1e6.",
+        f"Median over N={n_trials} trials/point (band = IQR), fixed nonzero $C={C_scale}$, state dimension 4, "
+        "7 sensors, full-rank $M^{(i)}$ at every point -- only the eigenvalue spread (conditioning) changes "
+        "along the x-axis. The prior paper's explicit bound is not evaluated anywhere on this plot because "
+        "none of these matrices are rank-1, which is its only proven case, regardless of conditioning.",
+    )
+    fig.savefig(perf_dir + 'fig2_emp9_condition_number_robustness.png', dpi=200)
+    plt.close(fig)
+    print(f"Saved {perf_dir}fig2_emp9_condition_number_robustness.png")
+
+
+# --------------------------------------------------------------------------------------
+# Figure 10: side-by-side panels -- their exact domain (rank-1) vs. our exact domain (full-rank), same C-sweep
+# --------------------------------------------------------------------------------------
+
+def fig2_emp10_domain_side_by_side(n_trials=120):
+    """Complements Figure 8's grid with a side-by-side line-plot version: two panels, same C-sweep,
+    LEFT held at rank-1 (their exact hypothesis) and RIGHT held at full rank (our exact hypothesis).
+    Makes the rank axis -- not just C -- the explicit thing being varied between panels, so the
+    full-rank requirement is something the reader watches happen, not just a caption claim."""
+    rng = np.random.default_rng(110)
+    C_scales = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+    def sweep_at_rank(rank, rng_local):
+        true_med, true_lo, true_hi, ours_med, ours_lo, ours_hi = [], [], [], [], [], []
+        for C_scale in C_scales:
+            trues, ours = [], []
+            for _ in range(n_trials):
+                P = np.eye(N_STATE) * P_SCALE
+                Ix = np.linalg.inv(P)
+                M = make_M_stack_with_rank(M_SENSORS, N_STATE, rank, 1e-2, 1.0, rng_local)
+                C = np.zeros((M_SENSORS, N_STATE)) if C_scale == 0 else generate_C(M_SENSORS, N_STATE, C_scale)
+                sigma2_vec = np.full(M_SENSORS, SIGMA2)
+                Ii_list, ci_list = per_sensor_info(M, C, P, sigma2_vec)
+                trues.append(empirical_gamma_h(M_SENSORS, Ix, Ii_list))
+                if rank == N_STATE:
+                    ours.append(theorem2_bound(M_SENSORS, Ix, Ii_list, ci_list, M, sigma2_vec))
+            true_med.append(np.median(trues)); true_lo.append(np.percentile(trues, 25)); true_hi.append(np.percentile(trues, 75))
+            if ours:
+                ours_med.append(np.median(ours)); ours_lo.append(np.percentile(ours, 25)); ours_hi.append(np.percentile(ours, 75))
+        out = (np.array(true_med), np.array(true_lo), np.array(true_hi))
+        if rank == N_STATE:
+            out = out + (np.array(ours_med), np.array(ours_lo), np.array(ours_hi))
+        return out
+
+    rank1_true_med, rank1_true_lo, rank1_true_hi = sweep_at_rank(1, rng)
+    prior_val = prior_at_rank1_c0(n_trials, rng)
+    full_true_med, full_true_lo, full_true_hi, full_ours_med, full_ours_lo, full_ours_hi = sweep_at_rank(N_STATE, rng)
+
+    fig, axes = plt.subplots(1, 2, figsize=(15.5, 8.0), sharey=True)
+
+    ax = axes[0]
+    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.15, zorder=0, hatch='xx')
+    ax.text(0.5, 0.28, "This paper's bound:\nNOT PROVEN\n(rank-deficient $M$)",
+            transform=ax.transAxes, ha='center', va='center', fontsize=10, color='#555555', style='italic', zorder=2)
+    ax.plot(C_scales, rank1_true_med, color=COLORS['empirical'], marker='o', label='True ratio (brute force)', zorder=3)
+    ax.fill_between(C_scales, rank1_true_lo, rank1_true_hi, color=COLORS['empirical'], alpha=0.12)
+    ax.scatter([0.0], [prior_val], s=200, color=COLORS['prior'], zorder=5, edgecolor='white', linewidth=1.5,
+               label="Prior paper's bound (only where proven)")
+    ax.set_yscale('log')
+    ax.set_xlim(-0.1, C_scales.max() * 1.05)
+    ax.set_xlabel(r'Linear-term magnitude $C$', fontsize=12.5)
+    ax.set_ylabel(r'Supermodularity ratio $\gamma_h$', fontsize=13)
+    ax.set_title("Their domain: $M^{(i)}$ held at rank-1", fontsize=13)
+    ax.grid(alpha=0.3)
+    ax.legend(loc='upper right', fontsize=9.5, framealpha=0.95)
+
+    ax = axes[1]
+    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.12, zorder=0, hatch='//')
+    ax.text(0.5, 0.28, "Prior paper's bound:\nNOT PROVEN\nin this region",
+            transform=ax.transAxes, ha='center', va='center', fontsize=10,
+            color='#555555', style='italic', zorder=2)
+    ax.plot(C_scales, full_true_med, color=COLORS['empirical'], marker='o', label='True ratio (brute force)', zorder=3)
+    ax.fill_between(C_scales, full_true_lo, full_true_hi, color=COLORS['empirical'], alpha=0.12)
+    ax.plot(C_scales, full_ours_med, color=COLORS['thm2'], marker='^', label='This paper (Theorem 2)', zorder=4)
+    ax.fill_between(C_scales, full_ours_lo, full_ours_hi, color=COLORS['thm2'], alpha=0.15)
+    ax.scatter([0.0], [prior_val], s=200, color=COLORS['prior'], zorder=5, edgecolor='white', linewidth=1.5,
+               label="Prior paper's bound (only where proven)")
+    ax.set_xlabel(r'Linear-term magnitude $C$', fontsize=12.5)
+    ax.set_title("Our domain: $M^{(i)}$ held at full rank", fontsize=13)
+    ax.grid(alpha=0.3)
+    ax.legend(loc='upper right', fontsize=9.5, framealpha=0.95)
+
+    fig.suptitle('Same $C$-sweep, two rank regimes: full rank is what unlocks coverage past $C=0$', y=0.975, fontsize=14.5)
+    fig.tight_layout(rect=[0, 0.16, 1, 0.90])
+    add_caption(
+        fig, 'Empirical 10',
+        "Their exact hypothesis (left) vs. ours (right), same C-sweep: rank is the axis that decides who has a bound at all.",
+        f"Median over N={n_trials} trials/point (bands = IQR), state dimension 4, 7 sensors. Left panel: "
+        "$M^{(i)}$ held at rank-1 throughout (their hypothesis) -- their bound is real only at the marked "
+        "$C=0$ point; this paper's Theorem 2 has nothing to plot here at all, since it requires full rank. "
+        "Right panel: $M^{(i)}$ held at full rank throughout (this paper's hypothesis) -- the same marked "
+        "prior-paper point is shown for reference, but their bound was never proven anywhere else in this "
+        "panel either. Rank, not just $C$, is what separates the two papers' proven domains.",
+    )
+    fig.savefig(perf_dir + 'fig2_emp10_domain_side_by_side.png', dpi=200)
+    plt.close(fig)
+    print(f"Saved {perf_dir}fig2_emp10_domain_side_by_side.png")
+
+
 if __name__ == "__main__":
     fig2_emp1_coverage_vs_C()
     fig2_emp2_coverage_by_noise()
     fig2_emp3_validation_scatter()
     fig2_emp4_bars_with_na()
     fig2_emp5_validation_histogram()
+    fig2_emp6_selection_cost_vs_C()
+    fig2_emp7_breakdown_vs_C()
+    fig2_emp8_domain_map()
+    fig2_emp9_condition_number_robustness()
+    fig2_emp10_domain_side_by_side()
