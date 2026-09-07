@@ -363,6 +363,37 @@ def fig2_cand3_reframed_tightness(n_trials=150):
 # Candidate 4: downstream consequence -- sensor-utilization cost of using the restricted machinery
 # --------------------------------------------------------------------------------------
 
+# **RETRACTION, 2026-09-06 (later session).** The "undershoot" statistic this function computes
+# (previously reported as ~51-98% depending on R_ratio, and described in Timeline.md as "one of the
+# strongest pieces of evidence produced this session") is INVALID. Root cause: the reachability check
+# below, `if len(S_star) == 0: return None`, does not do what it looks like it does.
+# `brute_force_select()` NEVER returns an empty list for an unreachable target -- when no subset (not
+# even the full sensor set) achieves R, it falls through to `return list(range(m)), h_fn(range(m))`, i.e.
+# it silently returns the FULL set with an h value that still exceeds R. `len(S_star) == 0` is only true
+# in the opposite, degenerate case (R so loose that the EMPTY set already satisfies it). So this function
+# was including large numbers of genuinely UNREACHABLE targets (R stricter than even the full sensor set,
+# using perfect true-model information, can achieve) in its statistics. In that regime, `S_quad` -- this
+# paper's OWN quadratic-aware greedy, run directly on the true model -- exhausts every sensor and ALSO
+# fails to meet R, at the same rate as the restricted view (verified directly: at R_ratio=0.01, 293/300
+# sampled trials were unreachable, and in every one of them BOTH methods failed). The original statistic
+# was measuring "how often is the target impossible for anyone," not "how often does the prior paper's
+# restricted view uniquely fail where this paper's method succeeds."
+#
+# After fixing the reachability check (compare `h_val(full set, true model)` to `R` directly) and
+# re-testing -- including deliberately targeting the reachability boundary (R just barely above the
+# full-set true optimum, the case most likely to expose a stopping-criterion error) across 1,000+ trials,
+# two very different M-generation regimes, and a wide C/noise range -- ZERO genuine restricted-view-only
+# failures were found: whenever the target was actually reachable, greedy selection driven by the
+# restricted view still met it, every single time tested. The likely reason: the restriction (dropping
+# $c_i$ entirely, keeping only $M^{(i)}$'s dominant eigenvalue) appears to make the restricted view
+# systematically pessimistic about each sensor's value rather than optimistic -- consistent with
+# `fig2_emp6`/`fig2_emp7`'s finding that it needs MORE sensors than optimal, never fewer. A method that
+# undervalues its sensors will over-select, not stop early, so it doesn't produce this kind of silent
+# failure. This function and `fig2_cand4_selection_cost()` are kept for the record (and because the
+# *cost* half of the finding -- more sensors needed -- is still correct, see `fig2_emp6`) but its
+# `undershoot` return value and the "~51% silently fail to meet the target" claim should not be cited or
+# reused; see `Timeline.md`'s matching retraction entry.
+
 def run_one_trial_selection_cost(R_ratio, seed):
     np.random.seed(seed)
     P = np.eye(N_STATE) * P_SCALE
@@ -376,9 +407,12 @@ def run_one_trial_selection_cost(R_ratio, seed):
     h0 = float(np.trace(P))
     R = h0 * R_ratio
 
+    if h_val(list(range(M_SENSORS)), Ix, Ii_true) > R:
+        return None  # correct reachability check: unreachable even with every sensor, true model
+
     S_star, _ = brute_force_select(M_SENSORS, Ix, Ii_true, R)
     if len(S_star) == 0:
-        return None
+        return None  # target so loose the empty set already satisfies it -- ratio undefined, skip
 
     S_quad = greedy_select(M_SENSORS, Ix, Ii_true, R)
     S_restricted = greedy_select(M_SENSORS, Ix, Ii_restricted, R)
