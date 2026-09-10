@@ -4,6 +4,9 @@ Prepared as a walkthrough for review. Math is stated precisely against the curre
 Theorem 1, Theorem 2, Proposition 2), not paraphrased, since the goal is a decision you can check against the
 derivation directly. Figure paths are relative to `LQG_QKF/CDC/`.
 
+*For general project background (what this folder is, how to run the code, the full reviewer-complaint
+audit), see [`Overview.md`](Overview.md) in this same folder.*
+
 ---
 
 ## 1. The story Figure 2 needs to tell

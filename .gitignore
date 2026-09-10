@@ -1,5 +1,4 @@
 .venv
-README.md
-CLAUDE.md
-Timeline.md
+*.md
+!LQG_QKF/CDC/README.md
 PaperFeedback.txt
