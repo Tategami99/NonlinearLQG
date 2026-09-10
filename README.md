@@ -2,10 +2,10 @@
 
 Prepared as a walkthrough for review. Math is stated precisely against the current `CDC2026.tex` (Definition 3,
 Theorem 1, Theorem 2, Proposition 2), not paraphrased, since the goal is a decision you can check against the
-derivation directly. Figure paths are relative to `LQG_QKF/CDC/`.
+derivation directly. Figure paths below are relative to the repo root.
 
 *For general project background (what this folder is, how to run the code, the full reviewer-complaint
-audit), see [`Overview.md`](Overview.md) in this same folder.*
+audit), see [`Overview.md`](LQG_QKF/CDC/Overview.md) in this same folder.*
 
 ---
 
@@ -31,7 +31,7 @@ be. Generality, not tightness.
 
 **Proposition 2** (Van Trees bound, quadratic model):
 $$B_S := \Big(I_x + \sum_{i\in S}\tfrac{1}{\sigma_i^2}\big(M^{(i)}PM^{(i)\top}+c_ic_i^\top\big)\Big)^{-1},
-\qquad h(S) := \operatorname{Tr}(B_S).$$
+\qquad h(S) := \mathrm{Tr}(B_S).$$
 
 **Definition 3** (supermodularity ratio, MIN-type, over the marginal-decrease family):
 $$\gamma_f := \min_{S_1\subseteq S_2\subseteq G,\; j\in G\setminus S_2}
@@ -46,7 +46,7 @@ $$\gamma_h \ge \min_{j\in G}\min\{\underline\gamma_f(j),\underline\gamma_g(j)\}.
 **Remark 1**: the problem assumes $R<h(\varnothing)$, else $S=\varnothing$ trivially satisfies the constraint.
 
 **Marginal gain of one sensor added to the empty set** (used throughout the single-sensor figures below):
-$$\Delta_j(\varnothing) = h(\varnothing)-h(\{j\}) = \operatorname{Tr}(P)-\operatorname{Tr}(B_j).$$
+$$\Delta_j(\varnothing) = h(\varnothing)-h(\{j\}) = \mathrm{Tr}(P)-\mathrm{Tr}(B_j).$$
 
 ### The foundational finding that ruled out a whole class of figures
 
@@ -73,7 +73,7 @@ place.
 
 **File:** `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_breakdown_vs_C.png`
 
-![Original emp7 two-panel figure](sensor_selection_test/perf/fig2_emp7_breakdown_vs_C.png)
+![Original emp7 two-panel figure](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_breakdown_vs_C.png)
 
 **Construction, top panel:** the same sweep as Figure 1's own data — true $\gamma_h$ (brute force) vs. this
 paper's Theorem 2 bound, full-rank $M^{(i)}$, $C$ swept from 0 to 3, log-scaled y-axis.
@@ -106,7 +106,7 @@ a labeling issue — it can't be fixed by better axis titles.
 
 **File:** `LQG_QKF/CDC/fig2_emp7_TEST_naive_top_panel.py` → `..._naive_top_panel.png`
 
-![Naive mirror attempt](sensor_selection_test/perf/fig2_emp7_TEST_naive_top_panel.png)
+![Naive mirror attempt](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_naive_top_panel.png)
 
 **Construction:** literally mirror the bottom panel — treat Theorem 2's bound as "predicted" and brute-force
 $\gamma_h$ as "true," full-rank $M^{(i)}$:
@@ -130,7 +130,7 @@ mirrored pair reads as "ours degrades too," which misattributes a proof-slack ar
 
 **File:** `LQG_QKF/CDC/fig2_emp7_TEST_exact_top_panel.py` → `..._exact_top_panel.png`
 
-![Exact-by-construction attempt](sensor_selection_test/perf/fig2_emp7_TEST_exact_top_panel.png)
+![Exact-by-construction attempt](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_exact_top_panel.png)
 
 **Construction:** use this paper's own (unrestricted) $\Delta_j(\varnothing)$ formula for *both* "predicted"
 and "true," full-rank $M_j$, real $c_j$ — i.e., don't approximate anything, since this paper's Theorem 2
@@ -151,7 +151,7 @@ in the first place. Rejected as the primary panel (kept as a documented dead end
 
 **File:** `LQG_QKF/CDC/fig2_emp7_TEST_applicability_top_panel.py` → `..._applicability_top_panel.png`
 
-![Applicability step-function attempt](sensor_selection_test/perf/fig2_emp7_TEST_applicability_top_panel.png)
+![Applicability step-function attempt](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_applicability_top_panel.png)
 
 **Construction:** instead of "how accurate," ask "does a number exist at all." At each $C$: this paper's
 Theorem 2 requires only $M^{(i)}$ full rank, so its explicit bound is computable in 100% of trials, at every
@@ -177,7 +177,7 @@ unmotivated duplication; both were rebuilt as single panels once this was pointe
 
 **File:** `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp6_selection_cost_vs_C.png`
 
-![emp6 corrected bar chart](sensor_selection_test/perf/fig2_emp6_selection_cost_vs_C.png)
+![emp6 corrected bar chart](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp6_selection_cost_vs_C.png)
 
 Building the efficiency figure required rerunning emp6's own Monte Carlo setup, which surfaced a bug: emp6
 never filtered out unreachable targets. `brute_force_select` silently returns the *full* sensor set when no
@@ -209,7 +209,7 @@ weaker one — but the previous caption was wrong about the shape of the effect 
 
 **File:** `LQG_QKF/CDC/fig2_emp7_TEST_efficiency_top_panel.py` → `..._efficiency_top_panel.png`
 
-![Efficiency, single panel](sensor_selection_test/perf/fig2_emp7_TEST_efficiency_top_panel.png)
+![Efficiency, single panel](LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_efficiency_top_panel.png)
 
 **Construction:** reuse emp6's (corrected) selection data, but as a normalized ratio instead of raw counts:
 $$\text{efficiency} = \frac{|S^\star|}{|S_{\text{selected}}|} \in (0,1],$$
@@ -235,7 +235,7 @@ from an identity.
 `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side.py` → `..._efficiency_side_by_side.png`
 `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side_highN.py` → `..._efficiency_side_by_side_highN.png`
 
-![Efficiency, side by side (candidate1, N=150)](sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side.png)
+![Efficiency, side by side (candidate1, N=150)](LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side.png)
 
 **Construction:** same efficiency metric as §7, split into two panels with **independent y-axis scales**,
 domain-labeled above each panel in the style of emp10 — left is this paper's own domain (full-rank $M^{(i)}$,
@@ -260,7 +260,7 @@ smoothly from $\approx0.89$ at $C=0$ to $\approx0.61$ at $C=3.0$.
 
 **File:** `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png`
 
-![Efficiency, side by side, high-N (recommended)](sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png)
+![Efficiency, side by side, high-N (recommended)](LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png)
 
 Same construction as §8, $N$ raised from 150 to **4000 trials/point** (12,279 valid trials after filtering, up
 from 449), to check whether the small dip on this paper's side is real or a thin-sample artifact.
@@ -312,11 +312,11 @@ view curve).
 
 | Figure | Script | PNG |
 |---|---|---|
-| Original two-panel | `fig2_empirical_coverage.py` (`fig2_emp7_breakdown_vs_C`) | `sensor_selection_test/perf/fig2_emp7_breakdown_vs_C.png` |
-| Naive mirror (rejected) | `fig2_emp7_TEST_naive_top_panel.py` | `sensor_selection_test/perf/fig2_emp7_TEST_naive_top_panel.png` |
-| Exact-by-construction (rejected) | `fig2_emp7_TEST_exact_top_panel.py` | `sensor_selection_test/perf/fig2_emp7_TEST_exact_top_panel.png` |
-| Applicability step function | `fig2_emp7_TEST_applicability_top_panel.py` | `sensor_selection_test/perf/fig2_emp7_TEST_applicability_top_panel.png` |
-| Sensor-count bars (corrected) | `fig2_empirical_coverage.py` (`fig2_emp6_selection_cost_vs_C`) | `sensor_selection_test/perf/fig2_emp6_selection_cost_vs_C.png` |
-| Efficiency, single panel | `fig2_emp7_TEST_decision_quality_top_panel.py` | `sensor_selection_test/perf/fig2_emp7_TEST_efficiency_top_panel.png` |
-| **Efficiency, side by side (candidate)** | `fig2_candidate1_efficiency_side_by_side.py` | `sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side.png` |
-| **Efficiency, side by side, high-N (recommended)** | `fig2_candidate1_efficiency_side_by_side_highN.py` | `sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png` |
+| Original two-panel | `LQG_QKF/CDC/fig2_empirical_coverage.py` (`fig2_emp7_breakdown_vs_C`) | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_breakdown_vs_C.png` |
+| Naive mirror (rejected) | `LQG_QKF/CDC/fig2_emp7_TEST_naive_top_panel.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_naive_top_panel.png` |
+| Exact-by-construction (rejected) | `LQG_QKF/CDC/fig2_emp7_TEST_exact_top_panel.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_exact_top_panel.png` |
+| Applicability step function | `LQG_QKF/CDC/fig2_emp7_TEST_applicability_top_panel.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_applicability_top_panel.png` |
+| Sensor-count bars (corrected) | `LQG_QKF/CDC/fig2_empirical_coverage.py` (`fig2_emp6_selection_cost_vs_C`) | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp6_selection_cost_vs_C.png` |
+| Efficiency, single panel | `LQG_QKF/CDC/fig2_emp7_TEST_decision_quality_top_panel.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_efficiency_top_panel.png` |
+| **Efficiency, side by side (candidate)** | `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side.png` |
+| **Efficiency, side by side, high-N (recommended)** | `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side_highN.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png` |
