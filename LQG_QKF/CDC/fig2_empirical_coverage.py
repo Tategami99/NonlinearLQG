@@ -562,13 +562,27 @@ def fig2_emp6_selection_cost_vs_C(n_trials=150, R_ratio=0.2):
 # --------------------------------------------------------------------------------------
 
 def fig2_emp7_breakdown_vs_C(n_trials=150):
+    """No number from `prior_bound_c19()` is plotted in the top panel (a change from an earlier version,
+    fixed alongside fig2_emp1/2/8/10 -- this one was missed in that pass and caught only when the user
+    asked a follow-up question about the bottom panel's exact formula). See fig2_emp1's docstring for why:
+    [19]'s explicit constant bounds a differently-defined quantity for a different problem, not gamma_h,
+    so it is not a valid comparison point even at their own rank-1/C=0 case.
+
+    Bottom panel: BOTH curves are the SAME per-sensor marginal-gain formula, `marginal_gain_first_sensor`
+    -- Delta_j(empty) = Tr(P) - Tr(B_j) (Proposition 2's Van Trees bound, one candidate sensor added to
+    the empty set) -- evaluated on two different inputs. "True" uses the real M_j (genuinely rank-1,
+    freshly randomized per trial -- matches [19]'s own hypothesis on the quadratic side exactly) and the
+    real c_j at the current C. "Predicted" uses `restrict_to_rank1_zero_c(M_j)` (a no-op here, since M_j
+    is already exactly rank-1) and c=0, REGARDLESS of the true C being swept -- i.e. what a user of [19]'s
+    framework would compute for this sensor, since their model has no parameter for a linear term at all.
+    At C=0 the two are the IDENTICAL quantity (not just close), since nothing is being approximated away
+    yet -- confirming ratio=1.0 there is an exact reproduction of their case, not a coincidence."""
     rng = np.random.default_rng(107)
     C_scales = np.array([0.0, 0.3, 0.6, 1.0, 1.5, 2.0, 2.5, 3.0])
 
     # Top panel: same coverage-vs-C data as Figure 1 (freshly computed here to keep this figure
     # self-contained rather than re-importing saved numbers).
     true_med, true_lo, true_hi, ours_med, ours_lo, ours_hi = sweep_vs_C(C_scales, SIGMA2, n_trials, rng)
-    prior_val = prior_at_rank1_c0(n_trials, rng)
 
     # Bottom panel: M is held at RANK-1 throughout (the prior paper's own exact hypothesis, unlike the
     # top panel which needs full-rank M) so that C=0 reproduces their case exactly (ratio=1.0) and the
@@ -597,13 +611,10 @@ def fig2_emp7_breakdown_vs_C(n_trials=150):
     fig, axes = plt.subplots(2, 1, figsize=(9.5, 12.8), sharex=True)
 
     ax = axes[0]
-    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.12, zorder=0, hatch='//')
     ax.plot(C_scales, true_med, color=COLORS['empirical'], marker='o', label='True ratio (brute force)', zorder=3)
     ax.fill_between(C_scales, true_lo, true_hi, color=COLORS['empirical'], alpha=0.12)
     ax.plot(C_scales, ours_med, color=COLORS['thm2'], marker='^', label='This paper (Theorem 2)', zorder=4)
     ax.fill_between(C_scales, ours_lo, ours_hi, color=COLORS['thm2'], alpha=0.15)
-    ax.scatter([0.0], [prior_val], s=180, color=COLORS['prior'], zorder=5, edgecolor='white', linewidth=1.4,
-               label="Prior paper's bound (only where proven)")
     ax.set_yscale('log')
     ax.set_ylabel(r'Supermodularity ratio $\gamma_h$', fontsize=12)
     ax.set_title('Top: our guarantee stays valid and present as $C$ grows', fontsize=12.5)
@@ -611,29 +622,32 @@ def fig2_emp7_breakdown_vs_C(n_trials=150):
     ax.legend(loc='center right', fontsize=9.5, framealpha=0.95)
 
     ax = axes[1]
-    ax.axvspan(0.05, C_scales.max() * 1.03, color=NA_GRAY, alpha=0.12, zorder=0, hatch='//')
-    ax.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Perfect representation', zorder=2)
+    ax.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Perfect representation (exact at $C=0$)', zorder=2)
     ax.plot(C_scales, pred_med, color=COLORS['prior'], marker='s', zorder=3,
-            label="Prior paper's rank-1/zero-$C$ prediction of the sensor")
+            label="[19]'s rank-1/zero-$C$ prediction of the sensor's own true value")
     ax.fill_between(C_scales, pred_lo, pred_hi, color=COLORS['prior'], alpha=0.15)
     ax.set_xlabel(r'Linear-term magnitude $C$ ($M^{(i)}$ held at rank-1: their own case)', fontsize=12.5)
-    ax.set_ylabel('Predicted / true\ninformation content', fontsize=11.5)
-    ax.set_title("Bottom: their representation of the same sensor degrades as $C$ grows", fontsize=12.5)
+    ax.set_ylabel(r'$\Delta_j(\varnothing)$ predicted / $\Delta_j(\varnothing)$ true' + '\n(one sensor\'s marginal information gain)', fontsize=11)
+    ax.set_title("Bottom: their prediction of the same sensor's own value degrades as $C$ grows", fontsize=12.5)
     ax.grid(alpha=0.3)
     ax.legend(loc='upper right', fontsize=9.5, framealpha=0.95)
 
     fig.suptitle('One works, one degrades: the same growing-$C$ axis, two coordinated panels', y=0.975, fontsize=14.5)
-    fig.tight_layout(rect=[0, 0.155, 1, 0.94])
+    fig.tight_layout(rect=[0, 0.185, 1, 0.94])
     add_caption(
         fig, 'Empirical 7',
-        "Top and bottom panels share the same x-axis: this paper's guarantee holds throughout while the prior paper's own representation of a sensor breaks down.",
-        f"Median over N={n_trials} trials/point (bands = IQR). Top panel: same result as Figure "
-        "Empirical 1, full-rank $M^{(i)}$ throughout (this paper's own domain). Bottom panel: a "
-        "different, independent check, with $M^{(i)}$ held at exactly rank-1 (the prior paper's own "
-        "domain, not this paper's) so $C=0$ reproduces their case exactly -- only $C$ changes along the "
-        "x-axis, isolating its effect. The two panels are not the same quantity, but they tell the same "
-        "story on the same axis: presence and validity for this paper as $C$ grows, versus a "
-        "representation that increasingly cannot see what is really there for the prior paper.",
+        "Top and bottom panels share the same x-axis: this paper's guarantee holds throughout while [19]'s own prediction of a sensor's value breaks down.",
+        f"Median over N={n_trials} trials/point (bands = IQR). Top panel: same result as Empirical 1, "
+        "full-rank $M^{(i)}$ throughout (this paper's own domain); no comparison to [19] is plotted, since "
+        "their explicit constant is not a bound on $\\gamma_h$ (see Empirical 1's caption). Bottom panel: "
+        "a different, independent check -- the marginal information gain $\\Delta_j(\\varnothing) = "
+        "\\mathrm{Tr}(P)-\\mathrm{Tr}(B_j)$ of adding ONE candidate sensor to the empty set, computed two "
+        "ways: with the sensor's real rank-1 $M_j$ and real $c_j$ (\"true\"), vs. with the same $M_j$ but "
+        "$c_j$ fixed at zero regardless of its real value (\"predicted\" -- what [19]'s framework computes, "
+        "since it has no parameter for a linear term at all). At $C=0$ these are the identical quantity, "
+        "not merely close, since $M_j$ is already exactly rank-1 and $c_j$ is already zero -- confirming "
+        "the ratio is exactly 1.0 there. As $C$ grows, real information enters only the true side, so the "
+        "prediction increasingly understates the sensor's actual value.",
         y=0.02,
     )
     fig.savefig(perf_dir + 'fig2_emp7_breakdown_vs_C.png', dpi=200)
