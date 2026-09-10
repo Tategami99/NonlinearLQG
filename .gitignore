@@ -1,3 +1,5 @@
 .venv
-*.md
+README.md
+CLAUDE.md
+Timeline.md
 PaperFeedback.txt
