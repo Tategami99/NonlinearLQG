@@ -21,6 +21,12 @@ rich, smoothly-varying curve on the left -- expect a line that's flat at 1.0 wit
 IS the honest result at this problem scale (7 candidate sensors): greedy is provably NOT always exactly
 optimal, and this is what "not always exactly optimal" looks like when it's checked empirically rather than
 assumed.
+
+**Legend cleaned up 2026-09-14, per supervisor feedback** (referencing a published figure as the target
+style): legends should name the SERIES (method), not the STATISTIC being plotted -- no "mean," "min-max
+range," etc. as legend text. The mean line is now labeled by method only ("This paper" / "[19] (restricted
+view)"); the shaded min-max band is still drawn but no longer gets its own legend entry -- it reads as that
+series' spread by being the same color as its line, the way the reference figure's per-method bands do.
 """
 
 import os
@@ -93,9 +99,9 @@ for c, m, lo, hi in zip(C_scales, restr_mean, restr_min, restr_max):
 
 fig, (axL, axR) = plt.subplots(1, 2, figsize=(14.5, 7.6))
 
-axL.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Matches optimal exactly', zorder=2)
-axL.plot(C_scales, quad_mean, color=COLORS['thm2'], marker='^', zorder=4, label='Mean efficiency')
-axL.fill_between(C_scales, quad_min, quad_max, color=COLORS['thm2'], alpha=0.15, label='Min-max range')
+axL.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Optimal', zorder=2)
+axL.plot(C_scales, quad_mean, color=COLORS['thm2'], marker='^', zorder=4, label='This paper')
+axL.fill_between(C_scales, quad_min, quad_max, color=COLORS['thm2'], alpha=0.15)
 axL.set_ylim(0.75, 1.03)
 axL.set_xlabel(r'Linear-term magnitude $C$', fontsize=12)
 axL.set_ylabel('Sensor-count efficiency\n(optimal count / count used)', fontsize=11)
@@ -104,9 +110,9 @@ axL.set_title("This paper's domain: full-rank $M^{(i)}$, quadratic-aware greedy\
 axL.grid(alpha=0.3)
 axL.legend(loc='lower left', fontsize=9.5, framealpha=0.95)
 
-axR.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Matches optimal exactly', zorder=2)
-axR.plot(C_scales, restr_mean, color=COLORS['prior'], marker='s', zorder=3, label='Mean efficiency')
-axR.fill_between(C_scales, restr_min, restr_max, color=COLORS['prior'], alpha=0.15, label='Min-max range')
+axR.axhline(1.0, color=COLORS['brute'], linestyle='--', linewidth=2, label='Optimal', zorder=2)
+axR.plot(C_scales, restr_mean, color=COLORS['prior'], marker='s', zorder=3, label='[19] (restricted view)')
+axR.fill_between(C_scales, restr_min, restr_max, color=COLORS['prior'], alpha=0.15)
 axR.set_ylim(0.45, 1.03)
 axR.set_xlabel(r'Linear-term magnitude $C$', fontsize=12)
 axR.set_ylabel('Sensor-count efficiency\n(optimal count / count used)', fontsize=11)

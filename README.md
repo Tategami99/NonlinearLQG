@@ -306,6 +306,14 @@ question with a technically correct answer.
 (the high-$N$ version, since it resolves the same story with less sampling noise and a smoother restricted-
 view curve).
 
+**Submission-styled version, 2026-09-14:** `fig2_candidate1_efficiency_side_by_side_publication.png` is the
+same data and construction restyled to match the house style already used in `fig1.png`/`fig2.png` (plain
+declarative title, one small gray context line instead of a baked-in caption paragraph, one shared legend
+below both panels, per supervisor feedback that legends should name the series, not the statistic). This is
+the version to actually submit; the annotated `_highN` version stays as the internal-review copy.
+
+![Efficiency, side by side, submission style](LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_publication.png)
+
 ---
 
 ## Appendix: file index
@@ -320,3 +328,4 @@ view curve).
 | Efficiency, single panel | `LQG_QKF/CDC/fig2_emp7_TEST_decision_quality_top_panel.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_emp7_TEST_efficiency_top_panel.png` |
 | **Efficiency, side by side (candidate)** | `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side.png` |
 | **Efficiency, side by side, high-N (recommended)** | `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side_highN.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_highN.png` |
+| **Efficiency, side by side, submission style (to submit)** | `LQG_QKF/CDC/fig2_candidate1_efficiency_side_by_side_publication.py` | `LQG_QKF/CDC/sensor_selection_test/perf/fig2_candidate1_efficiency_side_by_side_publication.png` |
